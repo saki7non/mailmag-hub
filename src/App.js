@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 const KEY_ARTICLES = "mailmag:articles";
 const KEY_MEMOS    = "mailmag:memos";
 const KEY_WEEKMEMO = "mailmag:weekmemo";
+const KEY_XPROMPTS = "mailmag:xprompts";
 
 // ── ストレージ操作 ─────────────────────────────────────────
 async function storageGet(key) {
@@ -13,17 +14,37 @@ async function storageSet(key, value) {
   try { return await window.storage.set(key, JSON.stringify(value)); } catch { return null; }
 }
 
+// ── タイトルの数字・記号を除去 ────────────────────────────
+function cleanTitle(t) {
+  return t
+    .replace(/^[\d]+[\.,\-\s。、]+/, "")
+    .replace(/^Vol\.?\d+[\s\u3000]*/i, "")
+    .replace(/^No\.?\d+[\s\u3000]*/i, "")
+    .replace(/^【?\d+号】?[\s\u3000]*/, "")
+    .trim();
+}
+
+// ── デフォルトXプロンプト ──────────────────────────────────
+const DEFAULT_XPROMPTS = [
+  { label:"共感・悩み型",   emoji:"💭", template:"「{{冒頭40文字}}…」\n\nこれ、ずっと悩んでた方いませんか？\n\n実は私も同じ状況でした。\nある方法を試したら毎月3万円変わったんです✨\n\n詳しくはメルマガで📩\n#家計管理 #節約 #主婦の知恵" },
+  { label:"ノウハウ型",     emoji:"💡", template:"✅ 知ってた？\n\n{{冒頭40文字}}…\n\nこれだけで毎月の出費がガラッと変わります。\n難しくないし今日からできる👌\n\n📩 詳しくはメルマガへ\n#節約術 #お金の知識" },
+  { label:"ストーリー型",   emoji:"📖", template:"📖 実話です。\n\n数年前の私は貯金0円でした。\n{{冒頭30文字}}…がきっかけで少しずつ変わりました🌸\n\n#貯金 #家計 #30代主婦" },
+  { label:"ハッとさせる型", emoji:"✨", template:"え、これ知らないと損かも。\n\n「{{冒頭25文字}}…」\n\nほとんどの人がやっていない、でも効果絶大💡\n\nメルマガで詳しく👇\n#お金 #節約 #ライフハック" },
+  { label:"日常・親近感型", emoji:"🌸", template:"今朝の我が家の話。\n\n{{冒頭35文字}}…\n\n小さな積み重ねが気づいたら大きな差に😌\n\n#主婦の日常 #家計管理 #暮らし" },
+];
+
+function applyTemplate(template, text) {
+  return template
+    .replace("{{冒頭40文字}}", text.slice(0,40))
+    .replace("{{冒頭35文字}}", text.slice(0,35))
+    .replace("{{冒頭30文字}}", text.slice(0,30))
+    .replace("{{冒頭25文字}}", text.slice(0,25));
+}
+
 // ── Transform helpers ──────────────────────────────────────
-function xTransform(text, style) {
-  const p = text.slice(0, 40);
-  const list = [
-    `「${p}…」\n\nこれ、ずっと悩んでた方いませんか？\n\n実は私も同じ状況でした。\nある方法を試したら毎月3万円変わったんです✨\n\n詳しくはメルマガで📩\n#家計管理 #節約 #主婦の知恵`,
-    `✅ 知ってた？\n\n${p}…\n\nこれだけで毎月の出費がガラッと変わります。\n難しくないし今日からできる👌\n\n📩 詳しくはメルマガへ\n#節約術 #お金の知識`,
-    `📖 実話です。\n\n数年前の私は貯金0円でした。\n${text.slice(0,30)}…がきっかけで少しずつ変わりました🌸\n\n#貯金 #家計 #30代主婦`,
-    `え、これ知らないと損かも。\n\n「${text.slice(0,25)}…」\n\nほとんどの人がやっていない、でも効果絶大💡\n\nメルマガで詳しく👇\n#お金 #節約 #ライフハック`,
-    `今朝の我が家の話。\n\n${text.slice(0,35)}…\n\n小さな積み重ねが気づいたら大きな差に😌\n\n#主婦の日常 #家計管理 #暮らし`,
-  ];
-  return list[style] || list[0];
+function xTransform(text, style, prompts) {
+  const tmpl = (prompts && prompts[style]?.template) || DEFAULT_XPROMPTS[style]?.template || "";
+  return applyTemplate(tmpl, text);
 }
 function noteTransform(text) {
   return text
@@ -99,6 +120,8 @@ export default function App() {
   const [mailTitle, setMailTitle]   = useState("");
   const [xPrompt, setXPrompt]       = useState(0);
   const [xOut, setXOut]             = useState("");
+  const [xPrompts, setXPrompts]     = useState(DEFAULT_XPROMPTS);
+  const [editingPrompt, setEditingPrompt] = useState(null);
   const [noteTitle, setNoteTitle]   = useState("");
   const [noteGenre, setNoteGenre]   = useState(GENRES[0]);
   const [noteText, setNoteText]     = useState("");
@@ -115,14 +138,16 @@ export default function App() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [a, m, w] = await Promise.all([
+      const [a, m, w, xp] = await Promise.all([
         storageGet(KEY_ARTICLES),
         storageGet(KEY_MEMOS),
         storageGet(KEY_WEEKMEMO),
+        storageGet(KEY_XPROMPTS),
       ]);
-      setArticles(a ? JSON.parse(a.value) : DEFAULT_ARTICLES);
-      setMemos(m    ? JSON.parse(m.value) : DEFAULT_MEMOS);
-      setWeekMemo(w ? JSON.parse(w.value) : "");
+      setArticles(a  ? JSON.parse(a.value)  : DEFAULT_ARTICLES);
+      setMemos(m     ? JSON.parse(m.value)  : DEFAULT_MEMOS);
+      setWeekMemo(w  ? JSON.parse(w.value)  : "");
+      setXPrompts(xp ? JSON.parse(xp.value) : DEFAULT_XPROMPTS);
       setLoading(false);
     })();
   }, []);
@@ -477,7 +502,7 @@ export default function App() {
                   </select>
                   <FLabel>週次リンク（プリティーリンク）</FLabel>
                   <input value={prettyLink} onChange={e => setPrettyLink(e.target.value)} placeholder="https://example.com/mail" style={{ ...input, marginBottom:14 }}/>
-                  <PinkBtn onClick={() => { setNoteText(noteTransform(mailText)); if(!noteTitle&&mailTitle) setNoteTitle(mailTitle); }}>◈ メルマガから本文を生成</PinkBtn>
+                  <PinkBtn onClick={() => { setNoteText(noteTransform(mailText)); if(!noteTitle&&mailTitle) setNoteTitle(cleanTitle(mailTitle)); }}>◈ メルマガから本文を生成</PinkBtn>
                 </Card>
                 <Card title="Preview" sub="転載プレビュー">
                   {noteTitle && <div style={{ fontSize:15, fontWeight:700, color:"#333", marginBottom:10 }}>{noteTitle}</div>}
@@ -505,20 +530,59 @@ export default function App() {
           {tab === "x" && (
             <div style={{ animation:"fi 0.2s ease" }}>
               <PageHead title="X Post" sub="X投稿変換" />
-              <Card title="Style Select" sub="投稿スタイルを選択">
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-                  {XPROMPTS.map((p,i) => (
-                    <button key={i} onClick={() => setXPrompt(i)} style={{ padding:"7px 16px", borderRadius:5, border:xPrompt===i?"none":"1px solid #ddd", background:xPrompt===i?"linear-gradient(135deg,#f06090,#e8789a)":"#fff", color:xPrompt===i?"#fff":"#666", fontWeight:xPrompt===i?700:400, fontSize:12.5, cursor:"pointer", transition:"all 0.15s", fontFamily:"inherit", boxShadow:xPrompt===i?"0 2px 8px rgba(232,120,154,0.3)":"none" }}>
-                      {p.emoji} {p.label}
-                    </button>
+
+              {/* スタイル選択 */}
+              <Card title="Style Select" sub="投稿スタイルを選択 · クリックで編集">
+                <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom: editingPrompt!==null ? 16 : 0 }}>
+                  {xPrompts.map((p,i) => (
+                    <div key={i} style={{ display:"flex", gap:4, alignItems:"center" }}>
+                      <button onClick={() => { setXPrompt(i); setEditingPrompt(null); }} style={{ padding:"7px 14px", borderRadius:"5px 0 0 5px", border:xPrompt===i?"none":"1px solid #ddd", borderRight:"none", background:xPrompt===i?"linear-gradient(135deg,#f06090,#e8789a)":"#fff", color:xPrompt===i?"#fff":"#666", fontWeight:xPrompt===i?700:400, fontSize:12.5, cursor:"pointer", fontFamily:"inherit", boxShadow:xPrompt===i?"0 2px 8px rgba(232,120,154,0.3)":"none" }}>
+                        {p.emoji} {p.label}
+                      </button>
+                      <button onClick={() => setEditingPrompt(editingPrompt===i ? null : i)} style={{ padding:"7px 8px", borderRadius:"0 5px 5px 0", border:"1px solid #ddd", background:editingPrompt===i?"#fff5f8":"#fff", color:editingPrompt===i?"#e8789a":"#bbb", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>✏️</button>
+                    </div>
                   ))}
                 </div>
+
+                {/* プロンプト編集パネル */}
+                {editingPrompt !== null && (
+                  <div style={{ marginTop:12, padding:"14px 16px", background:"#fff9fb", borderRadius:8, border:"1px solid #f5dde8" }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:"#e8789a", marginBottom:8 }}>
+                      ✏️ 「{xPrompts[editingPrompt].label}」のテンプレートを編集
+                    </div>
+                    <div style={{ fontSize:11, color:"#bbb", marginBottom:8 }}>
+                      使えるタグ：<code style={{background:"#f0f0f0",padding:"1px 5px",borderRadius:3}}>{"{{冒頭40文字}}"}</code>　<code style={{background:"#f0f0f0",padding:"1px 5px",borderRadius:3}}>{"{{冒頭30文字}}"}</code>　<code style={{background:"#f0f0f0",padding:"1px 5px",borderRadius:3}}>{"{{冒頭25文字}}"}</code>
+                    </div>
+                    <textarea
+                      value={xPrompts[editingPrompt].template}
+                      onChange={e => {
+                        const next = xPrompts.map((p,i) => i===editingPrompt ? {...p, template:e.target.value} : p);
+                        setXPrompts(next);
+                        storageSet(KEY_XPROMPTS, next);
+                      }}
+                      style={{ width:"100%", boxSizing:"border-box", padding:"10px 12px", border:"1px solid #e8c8d8", borderRadius:6, fontSize:12.5, lineHeight:1.8, resize:"vertical", height:140, fontFamily:"inherit", color:"#333", outline:"none" }}
+                    />
+                    <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                      <button onClick={() => {
+                        const next = xPrompts.map((p,i) => i===editingPrompt ? {...p, template:DEFAULT_XPROMPTS[i].template} : p);
+                        setXPrompts(next);
+                        storageSet(KEY_XPROMPTS, next);
+                      }} style={{ padding:"5px 12px", borderRadius:5, border:"1px solid #ddd", background:"#fff", color:"#aaa", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
+                        🔄 デフォルトに戻す
+                      </button>
+                      <button onClick={() => setEditingPrompt(null)} style={{ padding:"5px 12px", borderRadius:5, border:"none", background:"linear-gradient(135deg,#f06090,#e8789a)", color:"#fff", fontSize:11, cursor:"pointer", fontFamily:"inherit", fontWeight:700 }}>
+                        ✓ 完了
+                      </button>
+                    </div>
+                  </div>
+                )}
               </Card>
+
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginTop:16 }}>
                 <Card title="Source" sub="元のメルマガ文">
                   <textarea value={mailText} onChange={e => setMailText(e.target.value)} placeholder="メルマガ本文を貼り付けてください" style={{ ...ta, height:200 }}/>
                   <div style={{ marginTop:10 }}>
-                    <PinkBtn onClick={() => setXOut(xTransform(mailText, xPrompt))}>✨ X投稿に変換</PinkBtn>
+                    <PinkBtn onClick={() => setXOut(xTransform(mailText, xPrompt, xPrompts))}>✨ X投稿に変換</PinkBtn>
                   </div>
                 </Card>
                 <Card title="Output" sub="生成されたX投稿">
