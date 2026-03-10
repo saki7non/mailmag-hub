@@ -5,6 +5,7 @@ const KEY_ARTICLES = "mailmag:articles";
 const KEY_MEMOS    = "mailmag:memos";
 const KEY_WEEKMEMO = "mailmag:weekmemo";
 const KEY_XPROMPTS = "mailmag:xprompts";
+const KEY_YTPROMPT = "mailmag:ytprompt";
 
 // ── ストレージ操作 ─────────────────────────────────────────
 function storageGet(key) {
@@ -27,6 +28,33 @@ function cleanTitle(t) {
     .replace(/^【?\d+号】?[\s\u3000]*/,"")
     .trim();
 }
+
+// ── デフォルトYouTubeプロンプト ──────────────────────────────
+const DEFAULT_YTPROMPT = `【構成メモ】約10分動画
+
+■ ターゲット：30〜40代の主婦・お金の管理や貯蓄に困っている人
+■ ゴール：視聴者が「今日から1つやってみよう」と思える状態にする
+
+■ 冒頭フック（0〜30秒）
+→ 視聴者の悩みを代弁する一言から始める
+→ 例：「毎月お金が消えてく感覚、ありませんか？」
+
+■ 自己紹介（30秒〜1分）
+→ 名前・チャンネルの紹介・今日話す内容を一言で
+
+■ 本編の流れ
+1. 共感・問題提起（なぜこれが大事か）
+2. 解決策・具体的な方法（メルマガ本文をベースに）
+3. 実例・読者の声（メッセージを紹介）
+4. まとめ（3つ以内のポイントに絞る）
+
+■ エンディング
+→ メルマガ登録を促す
+→ チャンネル登録・高評価のお願い
+
+■ サムネイル文字案
+→ 数字を入れる（「月3万」「5つの習慣」など）
+→ 感情ワードを入れる（「損してた」「知らなかった」など）`;
 
 // ── デフォルトXプロンプト ──────────────────────────────────
 const DEFAULT_XPROMPTS = [
@@ -203,6 +231,8 @@ export default function App() {
   const [xOut, setXOut]             = useState("");
   const [xPrompts, setXPrompts]     = useState(DEFAULT_XPROMPTS);
   const [editingPrompt, setEditingPrompt] = useState(null);
+  const [ytPrompt, setYtPrompt]     = useState(DEFAULT_YTPROMPT);
+  const [editingMemo, setEditingMemo] = useState(null); // {id, title, body}
   const [noteTitle, setNoteTitle]   = useState("");
   const [noteGenre, setNoteGenre]   = useState(GENRES[0]);
   const [noteText, setNoteText]     = useState("");
@@ -218,14 +248,16 @@ export default function App() {
   // ── 起動時にストレージから読込 ──────────────────────────
   useEffect(() => {
     setLoading(true);
-    const a  = storageGet(KEY_ARTICLES);
-    const m  = storageGet(KEY_MEMOS);
-    const w  = storageGet(KEY_WEEKMEMO);
-    const xp = storageGet(KEY_XPROMPTS);
-    setArticles(a  ? JSON.parse(a.value)  : DEFAULT_ARTICLES);
-    setMemos(m     ? JSON.parse(m.value)  : DEFAULT_MEMOS);
-    setWeekMemo(w  ? JSON.parse(w.value)  : "");
-    setXPrompts(xp ? JSON.parse(xp.value) : DEFAULT_XPROMPTS);
+    const a   = storageGet(KEY_ARTICLES);
+    const m   = storageGet(KEY_MEMOS);
+    const w   = storageGet(KEY_WEEKMEMO);
+    const xp  = storageGet(KEY_XPROMPTS);
+    const ytp = storageGet(KEY_YTPROMPT);
+    setArticles(a   ? JSON.parse(a.value)   : DEFAULT_ARTICLES);
+    setMemos(m      ? JSON.parse(m.value)   : DEFAULT_MEMOS);
+    setWeekMemo(w   ? JSON.parse(w.value)   : "");
+    setXPrompts(xp  ? JSON.parse(xp.value)  : DEFAULT_XPROMPTS);
+    setYtPrompt(ytp ? JSON.parse(ytp.value) : DEFAULT_YTPROMPT);
     setLoading(false);
   }, []);
 
@@ -694,15 +726,40 @@ export default function App() {
           {tab === "youtube" && (
             <div style={{ animation:"fi 0.2s ease" }}>
               <PageHead title="YouTube Script" sub="YouTube台本生成" />
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+
+              {/* プロンプトメモ */}
+              <Card title="Prompt Memo" sub="動画構成メモ・プロンプト（自動保存）">
+                <div style={{ fontSize:12, color:"#e8789a", fontWeight:600, marginBottom:8 }}>
+                  📝 API連携後はここのメモをプロンプトとして活用します
+                </div>
+                <textarea
+                  value={ytPrompt}
+                  onChange={e => {
+                    setYtPrompt(e.target.value);
+                    storageSet(KEY_YTPROMPT, e.target.value);
+                  }}
+                  style={{ ...ta, height:180, border:"1px dashed #e8c8d8", background:"#fff9fb" }}
+                />
+                <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                  <button onClick={() => {
+                    setYtPrompt(DEFAULT_YTPROMPT);
+                    storageSet(KEY_YTPROMPT, DEFAULT_YTPROMPT);
+                  }} style={{ padding:"5px 12px", borderRadius:5, border:"1px solid #ddd", background:"#fff", color:"#aaa", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>
+                    🔄 デフォルトに戻す
+                  </button>
+                  <span style={{ fontSize:11, color:"#ccc", alignSelf:"center" }}>💾 入力内容は自動保存されます</span>
+                </div>
+              </Card>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginTop:16 }}>
                 <Card title="Source" sub="メルマガ本文">
-                  <textarea value={mailText} onChange={e => setMailText(e.target.value)} placeholder="メルマガ本文を貼り付けてください" style={{ ...ta, height:220 }}/>
+                  <textarea value={mailText} onChange={e => setMailText(e.target.value)} placeholder="メルマガ本文を貼り付けてください" style={{ ...ta, height:200 }}/>
                   <div style={{ marginTop:10 }}>
-                    <PinkBtn onClick={() => setYtScript(scriptGen(mailText))}>▷ 10分台本を生成</PinkBtn>
+                    <PinkBtn onClick={() => setYtScript(scriptGen(mailText))}>▷ 台本を生成</PinkBtn>
                   </div>
                 </Card>
                 <Card title="Script" sub="生成された台本">
-                  <textarea value={ytScript} onChange={e => setYtScript(e.target.value)} placeholder="「台本を生成」を押すとオープニング〜エンディングまで表示されます" style={{ ...ta, height:220 }}/>
+                  <textarea value={ytScript} onChange={e => setYtScript(e.target.value)} placeholder="「台本を生成」を押すとオープニング〜エンディングまで表示されます" style={{ ...ta, height:200 }}/>
                   {ytScript && (
                     <div style={{ marginTop:10 }}>
                       <PinkBtn onClick={() => cp(ytScript,"yt")}>{copied==="yt"?"✓ コピーしました":"📋 台本をコピー"}</PinkBtn>
@@ -718,25 +775,49 @@ export default function App() {
             <div style={{ animation:"fi 0.2s ease" }}>
               <PageHead title="Memo" sub="運営メモ · 💾 保存済" />
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1.8fr", gap:16 }}>
-                <Card title="Add Memo" sub="新しいメモを追加">
-                  <input value={memoTitle} onChange={e => setMemoTitle(e.target.value)} placeholder="タイトル" style={{ ...input, marginBottom:10 }}/>
-                  <textarea value={memoBody} onChange={e => setMemoBody(e.target.value)} placeholder="メモの内容…" style={{ ...ta, height:130, marginBottom:10 }}/>
-                  <PinkBtn onClick={addMemo}>💾 保存する</PinkBtn>
+                {/* 追加 or 編集フォーム */}
+                <Card title={editingMemo ? "Edit Memo" : "Add Memo"} sub={editingMemo ? "メモを編集" : "新しいメモを追加"}>
+                  <input
+                    value={editingMemo ? editingMemo.title : memoTitle}
+                    onChange={e => editingMemo ? setEditingMemo({...editingMemo, title:e.target.value}) : setMemoTitle(e.target.value)}
+                    placeholder="タイトル"
+                    style={{ ...input, marginBottom:10 }}
+                  />
+                  <textarea
+                    value={editingMemo ? editingMemo.body : memoBody}
+                    onChange={e => editingMemo ? setEditingMemo({...editingMemo, body:e.target.value}) : setMemoBody(e.target.value)}
+                    placeholder="メモの内容…"
+                    style={{ ...ta, height:130, marginBottom:10 }}
+                  />
+                  {editingMemo ? (
+                    <div style={{ display:"flex", gap:8 }}>
+                      <PinkBtn onClick={() => {
+                        persistMemos(memos.map(x => x.id===editingMemo.id ? {...x, title:editingMemo.title, body:editingMemo.body} : x));
+                        setEditingMemo(null);
+                      }}>💾 更新する</PinkBtn>
+                      <GhostBtn onClick={() => setEditingMemo(null)}>キャンセル</GhostBtn>
+                    </div>
+                  ) : (
+                    <PinkBtn onClick={addMemo}>💾 保存する</PinkBtn>
+                  )}
                 </Card>
+
+                {/* メモ一覧 */}
                 <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                   {[...memos].sort((a,b) => Number(b.pinned)-Number(a.pinned)).map(m => (
-                    <div key={m.id} style={{ background:"#fff", borderRadius:8, padding:"14px 18px", border:"1px solid #ececec", boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
+                    <div key={m.id} style={{ background:"#fff", borderRadius:8, padding:"14px 18px", border:`1px solid ${editingMemo?.id===m.id?"#e8789a":"#ececec"}`, boxShadow:"0 1px 4px rgba(0,0,0,0.05)", transition:"border 0.15s" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:7 }}>
                           {m.pinned && <SBadge bg="#fff0f5" c="#e8789a" br="#f5d0e0">◆ 固定</SBadge>}
                           <span style={{ fontSize:13.5, fontWeight:700, color:"#333" }}>{m.title}</span>
                         </div>
                         <div style={{ display:"flex", gap:4 }}>
-                          <button onClick={() => persistMemos(memos.map(x => x.id===m.id?{...x,pinned:!x.pinned}:x))} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:12, color:"#ccc", padding:"2px 5px", fontFamily:"inherit" }}>◆</button>
-                          <button onClick={() => { if(window.confirm("削除しますか？")) persistMemos(memos.filter(x=>x.id!==m.id)); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:12, color:"#ccc", padding:"2px 5px", fontFamily:"inherit" }}>✕</button>
+                          <button onClick={() => setEditingMemo({id:m.id, title:m.title, body:m.body})} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:12, color:"#e8a8c0", padding:"2px 5px", fontFamily:"inherit" }} title="編集">✏️</button>
+                          <button onClick={() => persistMemos(memos.map(x => x.id===m.id?{...x,pinned:!x.pinned}:x))} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:12, color:"#ccc", padding:"2px 5px", fontFamily:"inherit" }} title="固定">◆</button>
+                          <button onClick={() => { if(window.confirm("削除しますか？")) { persistMemos(memos.filter(x=>x.id!==m.id)); if(editingMemo?.id===m.id) setEditingMemo(null); }}} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:12, color:"#ccc", padding:"2px 5px", fontFamily:"inherit" }} title="削除">✕</button>
                         </div>
                       </div>
-                      <p style={{ fontSize:12.5, color:"#666", lineHeight:1.75, margin:0 }}>{m.body}</p>
+                      <p style={{ fontSize:12.5, color:"#666", lineHeight:1.75, margin:0, whiteSpace:"pre-wrap" }}>{m.body}</p>
                       <div style={{ fontSize:10.5, color:"#ccc", marginTop:8 }}>{m.date}</div>
                     </div>
                   ))}
