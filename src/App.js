@@ -59,7 +59,84 @@ function noteTransform(text) {
     .trim();
 }
 function scriptGen(text) {
-  return `【YouTube台本】約10分想定\n\n━━━━━━━━━━━━━━━\n🎬 オープニング（0:00〜1:00）\n━━━━━━━━━━━━━━━\n「こんにちは！[お名前]です。\n今日は『${text.slice(0,24)}』についてお話しします。\n\n30〜40代の主婦の方がお金の不安をなくして\nゆとりある暮らしを実現するヒントをお届けしています。」\n\n━━━━━━━━━━━━━━━\n📌 本編①：問題提起（1:00〜3:00）\n━━━━━━━━━━━━━━━\n「こんな悩みありませんか？\n・毎月お金が残らない\n・貯金しようとしても続かない\n・何から始めればいいかわからない」\n\n━━━━━━━━━━━━━━━\n💡 本編②：解決策（3:00〜7:00）\n━━━━━━━━━━━━━━━\n「${text.slice(0,200)}\n\nポイントをまとめると…\n① まず〇〇を見直す\n② 次に〇〇を習慣化する\n③ 最後に〇〇を仕組み化する」\n\n━━━━━━━━━━━━━━━\n✅ まとめ（7:00〜9:30）\n━━━━━━━━━━━━━━━\n「この3つを意識するだけで家計が変わります！\nぜひ今日からやってみてください。」\n\n━━━━━━━━━━━━━━━\n📣 エンディング（9:30〜10:00）\n━━━━━━━━━━━━━━━\n「最後まで見てくれてありがとうございます。\nチャンネル登録と高評価をぜひお願いします！またね👋」`;
+  // 本文を段落に分割して活用
+  const lines = text.split("\n").map(l=>l.trim()).filter(l=>l.length>10);
+  const intro   = lines.slice(0,2).join("\n") || text.slice(0,80);
+  const body    = lines.slice(2,8).join("\n") || text.slice(80,400);
+  const closing = lines.slice(-2).join("\n") || text.slice(-100);
+  const title   = text.slice(0,30);
+
+  return `【YouTube台本】約10分動画用
+━━━━━━━━━━━━━━━━━━━━
+🎬 オープニング（0:00〜1:00）
+━━━━━━━━━━━━━━━━━━━━
+▼ フック（最初の一言で引き込む）
+「${intro}」
+
+▼ 自己紹介＋チャンネル説明
+「こんにちは！さきです😊
+このチャンネルでは、30〜40代の主婦さんに向けて
+お金の不安をなくして、ゆとりある暮らしを手に入れる
+具体的な方法をお伝えしています。
+
+今日のテーマは【${title}】についてです。
+最後まで見ると〇〇がわかるので、ぜひ見ていってください！」
+
+━━━━━━━━━━━━━━━━━━━━
+📌 本編①：共感・問題提起（1:00〜3:00）
+━━━━━━━━━━━━━━━━━━━━
+▼ 視聴者の悩みに寄り添う
+「こんなお悩み、ありませんか？
+・毎月なぜかお金が残らない
+・貯金しようと思っても続かない
+・何から手をつければいいかわからない
+
+実は私も数年前、まったく同じ状況でした。
+でも、あることに気づいてから変わったんです。」
+
+━━━━━━━━━━━━━━━━━━━━
+💡 本編②：解決策・メインコンテンツ（3:00〜7:30）
+━━━━━━━━━━━━━━━━━━━━
+▼ メルマガから抜粋・肉付けして使う
+「${body}」
+
+▼ ポイント整理（ここを丁寧に話す）
+「今お伝えした内容をまとめると、
+① 〇〇を見直すことで支出が見える化される
+② 〇〇を仕組み化することで続けやすくなる
+③ 〇〇を意識するだけで貯金ペースが変わる
+
+この3つ、どれか一つでも今日からやってみてください！」
+
+━━━━━━━━━━━━━━━━━━━━
+🌸 本編③：実例・体験談（7:30〜9:00）
+━━━━━━━━━━━━━━━━━━━━
+▼ 読者さんの声・自分の体験を入れる
+「実際にやってみた読者さんからこんなメッセージをいただきました。
+『${closing}』
+
+小さな一歩が、半年後・1年後に大きな差になります。」
+
+━━━━━━━━━━━━━━━━━━━━
+✅ まとめ＆エンディング（9:00〜10:00）
+━━━━━━━━━━━━━━━━━━━━
+▼ まとめ
+「今日お伝えしたのは【${title}】でした。
+難しく考えなくて大丈夫！まず一つだけやってみてくださいね😊」
+
+▼ CTA（行動を促す）
+「もっと詳しく知りたい方は、概要欄のメルマガに登録してください。
+毎日（日曜除く）、お金の知恵をお届けしています📩
+
+チャンネル登録と高評価もぜひお願いします！
+またね👋」
+━━━━━━━━━━━━━━━━━━━━
+📝 撮影メモ
+・サムネ文字案：「${title}」
+・冒頭30秒で視聴者の悩みを言い切る
+・ポイント整理は画面テロップを活用
+・エンディングでメルマガURLを画面表示
+━━━━━━━━━━━━━━━━━━━━`;
 }
 
 // ── 初期データ ─────────────────────────────────────────────
@@ -547,10 +624,25 @@ export default function App() {
                 {/* プロンプト編集パネル */}
                 {editingPrompt !== null && (
                   <div style={{ marginTop:12, padding:"14px 16px", background:"#fff9fb", borderRadius:8, border:"1px solid #f5dde8" }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:"#e8789a", marginBottom:8 }}>
-                      ✏️ 「{xPrompts[editingPrompt].label}」のテンプレートを編集
+                    <div style={{ fontSize:12, fontWeight:700, color:"#e8789a", marginBottom:10 }}>
+                      ✏️ スタイルを編集
                     </div>
-                    <div style={{ fontSize:11, color:"#bbb", marginBottom:8 }}>
+                    {/* ラベル編集 */}
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:10 }}>
+                      <label style={{ fontSize:11, color:"#aaa", fontWeight:600, whiteSpace:"nowrap", width:60 }}>スタイル名</label>
+                      <input
+                        value={xPrompts[editingPrompt].label}
+                        onChange={e => {
+                          const next = xPrompts.map((p,i) => i===editingPrompt ? {...p, label:e.target.value} : p);
+                          setXPrompts(next);
+                          storageSet(KEY_XPROMPTS, next);
+                        }}
+                        style={{ flex:1, padding:"7px 10px", border:"1px solid #e8c8d8", borderRadius:6, fontSize:13, fontFamily:"inherit", color:"#333", outline:"none" }}
+                      />
+                    </div>
+                    {/* テンプレート編集 */}
+                    <div style={{ fontSize:11, color:"#aaa", fontWeight:600, marginBottom:5 }}>プロンプトテンプレート</div>
+                    <div style={{ fontSize:11, color:"#bbb", marginBottom:6 }}>
                       使えるタグ：<code style={{background:"#f0f0f0",padding:"1px 5px",borderRadius:3}}>{"{{冒頭40文字}}"}</code>　<code style={{background:"#f0f0f0",padding:"1px 5px",borderRadius:3}}>{"{{冒頭30文字}}"}</code>　<code style={{background:"#f0f0f0",padding:"1px 5px",borderRadius:3}}>{"{{冒頭25文字}}"}</code>
                     </div>
                     <textarea
