@@ -7,20 +7,24 @@ const KEY_WEEKMEMO = "mailmag:weekmemo";
 const KEY_XPROMPTS = "mailmag:xprompts";
 
 // ── ストレージ操作 ─────────────────────────────────────────
-async function storageGet(key) {
-  try { return await window.storage.get(key); } catch { return null; }
+function storageGet(key) {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? { value: v } : null;
+  } catch { return null; }
 }
-async function storageSet(key, value) {
-  try { return await window.storage.set(key, JSON.stringify(value)); } catch { return null; }
+function storageSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
 // ── タイトルの数字・記号を除去 ────────────────────────────
 function cleanTitle(t) {
   return t
-    .replace(/^[\d]+[\.,\-\s。、]+/, "")
-    .replace(/^Vol\.?\d+[\s\u3000]*/i, "")
-    .replace(/^No\.?\d+[\s\u3000]*/i, "")
-    .replace(/^【?\d+号】?[\s\u3000]*/, "")
+    .replace(/^[『「【]?[\d]+[.．\-][\d]*[』」】]?[\s\u3000]*/,"") // 『3.10』『3』など
+    .replace(/^[\d]+[.．\-][\d]*[\s\u3000]*/,"")                  // 3.10 など
+    .replace(/^Vol\.?\d+[\s\u3000]*/i,"")
+    .replace(/^No\.?\d+[\s\u3000]*/i,"")
+    .replace(/^【?\d+号】?[\s\u3000]*/,"")
     .trim();
 }
 
@@ -213,20 +217,16 @@ export default function App() {
 
   // ── 起動時にストレージから読込 ──────────────────────────
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const [a, m, w, xp] = await Promise.all([
-        storageGet(KEY_ARTICLES),
-        storageGet(KEY_MEMOS),
-        storageGet(KEY_WEEKMEMO),
-        storageGet(KEY_XPROMPTS),
-      ]);
-      setArticles(a  ? JSON.parse(a.value)  : DEFAULT_ARTICLES);
-      setMemos(m     ? JSON.parse(m.value)  : DEFAULT_MEMOS);
-      setWeekMemo(w  ? JSON.parse(w.value)  : "");
-      setXPrompts(xp ? JSON.parse(xp.value) : DEFAULT_XPROMPTS);
-      setLoading(false);
-    })();
+    setLoading(true);
+    const a  = storageGet(KEY_ARTICLES);
+    const m  = storageGet(KEY_MEMOS);
+    const w  = storageGet(KEY_WEEKMEMO);
+    const xp = storageGet(KEY_XPROMPTS);
+    setArticles(a  ? JSON.parse(a.value)  : DEFAULT_ARTICLES);
+    setMemos(m     ? JSON.parse(m.value)  : DEFAULT_MEMOS);
+    setWeekMemo(w  ? JSON.parse(w.value)  : "");
+    setXPrompts(xp ? JSON.parse(xp.value) : DEFAULT_XPROMPTS);
+    setLoading(false);
   }, []);
 
   // ── 保存ヘルパー ────────────────────────────────────────
@@ -236,19 +236,19 @@ export default function App() {
     setTimeout(() => setSaveStatus(""), 2000);
   }, []);
 
-  async function persistArticles(next) {
+  function persistArticles(next) {
     setArticles(next);
-    await storageSet(KEY_ARTICLES, next);
+    storageSet(KEY_ARTICLES, next);
     showSaved();
   }
-  async function persistMemos(next) {
+  function persistMemos(next) {
     setMemos(next);
-    await storageSet(KEY_MEMOS, next);
+    storageSet(KEY_MEMOS, next);
     showSaved();
   }
-  async function persistWeekMemo(val) {
+  function persistWeekMemo(val) {
     setWeekMemo(val);
-    await storageSet(KEY_WEEKMEMO, val);
+    storageSet(KEY_WEEKMEMO, val);
   }
 
   // ── 操作関数 ────────────────────────────────────────────
@@ -288,11 +288,11 @@ export default function App() {
     setTab("mailmag");
   }
 
-  async function saveArticle() {
+  function saveArticle() {
     if (!mailText.trim()) return;
     const title = mailTitle || mailText.slice(0,20)+"…";
     const next = [{ id:Date.now(), date:new Date().toISOString().slice(0,10), title, genre:"未分類", src:"manual", status:[] }, ...articles];
-    await persistArticles(next);
+    persistArticles(next);
     setMailText(""); setMailTitle("");
   }
 
@@ -301,10 +301,10 @@ export default function App() {
     await persistArticles(next);
   }
 
-  async function addMemo() {
+  function addMemo() {
     if (!memoTitle.trim()) return;
     const next = [{ id:Date.now(), title:memoTitle, body:memoBody, pinned:false, date:new Date().toISOString().slice(0,10) }, ...memos];
-    await persistMemos(next);
+    persistMemos(next);
     setMemoTitle(""); setMemoBody("");
   }
 
